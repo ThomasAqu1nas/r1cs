@@ -1,0 +1,9 @@
+[package]
+name = "zk-learn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+modular_math = "0.1.6"
+num-traits = "0.2.19"
+primitive-types = { version = "0.12.2", features = ["num-traits"] }
