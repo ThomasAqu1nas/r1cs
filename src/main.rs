@@ -5,7 +5,7 @@ use primitive_types::U256;
 pub mod linear;
 
 fn main() {
-    let a = LinearComb::new(U256::from_dec_str(
+    let a: LinearComb = LinearComb::new(U256::from_dec_str(
         "17"
     ).unwrap(), vec![
         1,
@@ -18,7 +18,7 @@ fn main() {
         ]
     );
 
-    let b = LinearComb::new(U256::from_dec_str(
+    let b: LinearComb = LinearComb::new(U256::from_dec_str(
         "17"
     ).unwrap(), vec![
         1,
@@ -31,14 +31,14 @@ fn main() {
         ]
     );
 
-    let c = a.ladd(&b);
-    let d = c.wmul(&U256::from_dec_str("9").unwrap());
-    let e = d.lsub(&c);
-    let f = e.ldiv(&U256::from_dec_str("123").unwrap());
-    let g = f.lpow(&U256::from(13));
-    let nesting = g.depth();
-    let linear = g.linear_comb();
-    let r1cs = g.r1cs();
+    let c: linear::ops::AddLC<LinearComb> = a.ladd(&b);
+    let d: linear::ops::AddLC<LinearComb> = c.wmul(&U256::from_dec_str("9").unwrap());
+    let e: linear::ops::SubLC<linear::ops::AddLC<LinearComb>> = d.lsub(&c);
+    let f: linear::ops::SubLC<linear::ops::AddLC<LinearComb>> = e.ldiv(&U256::from_dec_str("123").unwrap());
+    let g: linear::ops::PowLC<linear::ops::SubLC<linear::ops::AddLC<LinearComb>>> = f.lpow(&U256::from(13));
+    let nesting: usize = g.depth();
+    let linear: LinearComb = g.linear_comb();
+    let r1cs: linear::r1cs::R1CS = g.r1cs();
     println!("{nesting}");
     println!("lienar comb: {:#?}", linear);
     println!("r1cs: {:#?}", r1cs);
