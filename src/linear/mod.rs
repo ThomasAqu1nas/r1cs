@@ -1,9 +1,9 @@
 pub mod ops;
 pub mod constraint;
 pub mod r1cs;
-use std::{collections::HashMap, ops::{Add, Mul, Sub}};
+use std::{collections::{BTreeMap, HashMap}, fmt::{Display, Formatter, Result}, ops::{Add, Mul, Sub}};
 use constraint::Constraint;
-use modular_math::mod_math;
+use modular_math::mod_math::{self, ModMath};
 use ops::Linear;
 use primitive_types::U256;
 
@@ -11,7 +11,7 @@ use primitive_types::U256;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LinearComb {
     modulus: U256,
-    terms: HashMap<usize, U256>,
+    terms: BTreeMap<usize, U256>,
 }
 
 impl Linear for LinearComb {
@@ -32,14 +32,14 @@ impl Linear for LinearComb {
     }
 
     fn indexes(&self) -> Vec<usize> {
-        LinearComb::indexes(&self)
+        self.indexes()
     }
 
     fn scalars(&self) -> Vec<U256> {
         self.scalars()
     }
 
-    fn terms(&self) -> HashMap<usize, U256> {
+    fn terms(&self) -> BTreeMap<usize, U256> {
         self.terms.clone()
     }
     
@@ -54,26 +54,62 @@ impl Linear for LinearComb {
     fn inner(&self) -> Self::Inner {
         self.clone()
     }
+
+    fn math(&self) -> mod_math::ModMath {
+        mod_math::ModMath::new(self.modulus())
+    }
     
     type Inner = Self;
+}
+
+impl Display for LinearComb {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let mut indices: Vec<_> = self.terms.keys().cloned().collect();
+        indices.sort_unstable();
+
+        let mut first_term = true;
+
+        for i in indices {
+            let scalar = self.terms[&i];
+            if scalar == U256::from(0) {
+                continue;
+            }
+            if !first_term {
+                write!(f, " + ")?;
+            }
+            if i == 0 {
+                write!(f, "{}", scalar)?;
+            } else {
+                write!(f, "x{} * {}", i, scalar)?;
+            }
+
+            first_term = false;
+        }
+        write!(f, " | mod {}", self.modulus)
+    }
 }
 
 impl LinearComb {
     pub fn new(modulus: U256, indexes: Vec<usize>, scalars: Vec<U256>) -> Self {
         assert_eq!(indexes.len(), scalars.len());
-        let indexes = [0usize..indexes.len()]
-            .iter().enumerate().map(|(i, _)| i)
-            .collect::<Vec<_>>();
-        let result_terms = indexes.iter().zip(&scalars)
-            .map(|(&index, &scalar)| {
-                (index, scalar)
+        let mm = ModMath::new(modulus);
+        let terms = indexes.into_iter()
+            .zip(scalars.into_iter())
+            .map(|(index, scalar)| {
+                (index, mm.modulus(scalar))
             })
-            .collect::<HashMap<_, _>>();
-        Self { modulus, terms: result_terms }
+            .collect::<BTreeMap<_, _>>();
+
+        Self { modulus, terms }
     }
 
     pub fn new_terms(modulus: U256, terms: HashMap<usize, U256>) -> Self {
         assert_eq!(terms.keys().len(), terms.values().len());
+        let mm = ModMath::new(modulus);
+        let terms = terms.into_iter()
+            .map(|(i, s)| {
+                (i, mm.modulus(s))
+            }).collect();
         Self { modulus, terms }
     }
 
@@ -86,11 +122,7 @@ impl LinearComb {
     } 
 
     fn indexes(&self) -> Vec<usize> {
-        self.terms.iter()
-            .map(|(index, _scalar)| {
-                *index
-            })
-            .collect()
+        self.terms.keys().copied().collect()
     } 
 
     pub fn get(&self, values: &[U256]) -> U256 {
@@ -131,7 +163,7 @@ impl LinearComb {
     }
 
     pub fn one(modulus: U256) -> Self {
-        let mut result = HashMap::<usize, U256>::new();
+        let mut result = BTreeMap::<usize, U256>::new();
         result.insert(0, U256::one());
         Self { modulus, terms: result }
     }
